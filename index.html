@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#FAF8F4">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Erge Pilates">
+  <meta name="description" content="Erge Pilates — Şəxsi Dərs Paneliniz">
+  <title>Erge Pilates</title>
+
+  <!-- Google Fonts: Cormorant Garamond (display) + DM Sans (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <style>
+    /* ── CSS Reset & Variables ───────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cream:       #FAF8F4;
+      --cream-dark:  #F2EDE6;
+      --parchment:   #EDE6DA;
+      --rose:        #C07E6A;
+      --rose-light:  #DDB8AC;
+      --rose-muted:  #F0DDD8;
+      --sage:        #7E9B82;
+      --sage-light:  #C5D9C7;
+      --charcoal:    #1E1C1A;
+      --ink:         #3A3633;
+      --gray:        #7A756F;
+      --gray-light:  #B8B2AB;
+      --white:       #FFFFFF;
+      --card-shadow: 0 2px 12px rgba(30,28,26,0.07), 0 1px 3px rgba(30,28,26,0.05);
+      --font-display: 'Cormorant Garamond', Georgia, serif;
+      --font-body:    'DM Sans', system-ui, sans-serif;
+    }
+
+    html {
+      background: var(--cream);
+      min-height: 100%;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 15px;
+      color: var(--ink);
+      background: var(--cream);
+      min-height: 100svh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout Shell ────────────────────────────────────────────── */
+    #app {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100svh;
+      position: relative;
+    }
+
+    /* ── Screens ─────────────────────────────────────────────────── */
+    .screen {
+      display: none;
+      min-height: 100svh;
+      flex-direction: column;
+    }
+    .screen.active { display: flex; }
+
+    /* ── Loading Screen ──────────────────────────────────────────── */
+    #screen-loading {
+      align-items: center;
+      justify-content: center;
+      background: var(--cream);
+    }
+    .loading-logo {
+      text-align: center;
+      animation: fadeInUp 0.6s ease both;
+    }
+    .loading-logo .brand-mark {
+      display: block;
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 20px;
+      border: 1.5px solid var(--rose);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .loading-logo .brand-mark svg {
+      width: 28px;
+      height: 28px;
+      stroke: var(--rose);
+      fill: none;
+    }
+    .loading-text {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      color: var(--charcoal);
+    }
+    .loading-sub {
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gray);
+      margin-top: 6px;
+    }
+    .loading-spinner {
+      width: 28px;
+      height: 28px;
+      border: 2px solid var(--parchment);
+      border-top-color: var(--rose);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 32px auto 0;
+    }
+
+    /* ── Login Screen ────────────────────────────────────────────── */
+    #screen-login {
+      background: var(--cream);
+      padding: 0;
+    }
+    .login-hero {
+      background: linear-gradient(160deg, var(--charcoal) 0%, #3A2E28 100%);
+      padding: 64px 32px 40px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .login-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 120%, rgba(192,126,106,0.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .login-hero .logo-ring {
+      width: 72px;
+      height: 72px;
+      border: 1.5px solid rgba(192,126,106,0.5);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      position: relative;
+    }
+    .login-hero .logo-ring::after {
+      content: '';
+      position: absolute;
+      inset: 5px;
+      border: 1px solid rgba(192,126,106,0.2);
+      border-radius: 50%;
+    }
+    .login-hero .logo-ring svg {
+      width: 32px;
+      height: 32px;
+      stroke: var(--rose-light);
+      fill: none;
+    }
+    .login-hero h1 {
+      font-family: var(--font-display);
+      font-size: 36px;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      color: var(--white);
+      margin-bottom: 6px;
+    }
+    .login-hero p {
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--rose-light);
+    }
+
+    .login-body {
+      padding: 36px 28px 40px;
+      flex: 1;
+    }
+    .login-body h2 {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 400;
+      color: var(--charcoal);
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--gray);
+      margin-bottom: 8px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1.5px solid var(--parchment);
+      border-radius: 10px;
+      font-family: var(--font-body);
+      font-size: 15px;
+      color: var(--charcoal);
+      background: var(--white);
+      transition: border-color 0.2s;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .form-group input:focus {
+      border-color: var(--rose);
+    }
+    .form-group input::placeholder {
+      color: var(--gray-light);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 16px;
+      background: var(--charcoal);
+      color: var(--white);
+      border: none;
+      border-radius: 10px;
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      margin-top: 8px;
+    }
+    .btn-primary:active { transform: scale(0.99); }
+    .btn-primary:disabled {
+      background: var(--gray-light);
+      cursor: not-allowed;
+    }
+    .btn-primary.loading-btn {
+      position: relative;
+      color: transparent;
+    }
+    .btn-primary.loading-btn::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .error-msg {
+      background: #FDF0EE;
+      border: 1px solid #EDCCC7;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #9B4A3A;
+      margin-top: 14px;
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+
+    /* ── Dashboard Screen ────────────────────────────────────────── */
+    #screen-dashboard {
+      flex-direction: column;
+      background: var(--cream);
+    }
+
+    /* Header */
+    .dash-header {
+      background: linear-gradient(160deg, var(--charcoal) 0%, #3A2E28 100%);
+      padding: 52px 24px 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .dash-header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 100% 80% at 50% 130%, rgba(192,126,106,0.15) 0%, transparent 70%);
+    }
+    .dash-header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      position: relative;
+    }
+    .dash-greeting {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-style: italic;
+      color: var(--rose-light);
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+    .dash-name {
+      font-family: var(--font-display);
+      font-size: 30px;
+      font-weight: 400;
+      color: var(--white);
+      letter-spacing: 0.02em;
+      line-height: 1.15;
+    }
+    .btn-logout {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      color: rgba(255,255,255,0.55);
+      font-family: var(--font-body);
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      padding: 8px 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-left: 12px;
+      margin-top: 4px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.14); color: rgba(255,255,255,0.8); }
+
+    /* Quick stats strip in header */
+    .dash-quick-stats {
+      display: flex;
+      gap: 10px;
+      margin-top: 22px;
+      position: relative;
+    }
+    .dash-stat-pill {
+      flex: 1;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 12px 10px;
+      text-align: center;
+    }
+    .dash-stat-pill .stat-val {
+      font-family: var(--font-display);
+      font-size: 26px;
+      font-weight: 500;
+      color: var(--white);
+      line-height: 1;
+    }
+    .dash-stat-pill .stat-val.rose { color: var(--rose-light); }
+    .dash-stat-pill .stat-lbl {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+      margin-top: 5px;
+    }
+
+    /* Main content */
+    .dash-content {
+      flex: 1;
+      padding: 20px 16px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Section Card */
+    .section-card {
+      background: var(--white);
+      border-radius: 16px;
+      box-shadow: var(--card-shadow);
+      overflow: hidden;
+      animation: fadeInUp 0.4s ease both;
+    }
+    .section-card:nth-child(2) { animation-delay: 0.06s; }
+    .section-card:nth-child(3) { animation-delay: 0.12s; }
+    .section-card:nth-child(4) { animation-delay: 0.18s; }
+
+    .section-head {
+      padding: 16px 18px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .section-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .section-icon.rose-bg { background: var(--rose-muted); }
+    .section-icon.sage-bg { background: var(--sage-light); opacity: 0.8; }
+    .section-icon.parchment-bg { background: var(--parchment); }
+    .section-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke: var(--rose);
+      fill: none;
+      stroke-width: 1.8;
+    }
+    .section-icon.sage-bg svg { stroke: var(--sage); }
+    .section-icon.parchment-bg svg { stroke: var(--ink); }
+    .section-title {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gray);
+    }
+
+    /* Subscription card body */
+    .sub-body {
+      padding: 0 18px 18px;
+    }
+    .sub-program-name {
+      font-family: var(--font-display);
+      font-size: 21px;
+      font-weight: 500;
+      color: var(--charcoal);
+      margin-bottom: 12px;
+      line-height: 1.2;
+    }
+    .sub-details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .sub-detail {
+      background: var(--cream);
+      border-radius: 10px;
+      padding: 11px 13px;
+    }
+    .sub-detail .detail-lbl {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--gray);
+      margin-bottom: 4px;
+    }
+    .sub-detail .detail-val {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--charcoal);
+    }
+    .sub-detail .detail-val.accent { color: var(--rose); }
+
+    /* Status badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      margin-bottom: 12px;
+    }
+    .status-badge.active { background: #EAF4EB; color: #3D7A45; }
+    .status-badge.pending { background: #FEF6E7; color: #9A6C1A; }
+    .status-badge.expired { background: #FAEAEA; color: #9B3A3A; }
+    .status-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Remaining sessions */
+    .remaining-display {
+      padding: 18px 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .remaining-circle {
+      position: relative;
+      flex-shrink: 0;
+    }
+    .remaining-circle svg {
+      transform: rotate(-90deg);
+    }
+    .remaining-circle .circle-bg { stroke: var(--parchment); }
+    .remaining-circle .circle-fill {
+      stroke: var(--rose);
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.6s ease;
+    }
+    .remaining-circle .circle-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transform: none;
+    }
+    .remaining-circle .circle-num {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--charcoal);
+      line-height: 1;
+    }
+    .remaining-circle .circle-of {
+      font-size: 10px;
+      color: var(--gray-light);
+      letter-spacing: 0.05em;
+    }
+    .remaining-text h3 {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 400;
+      color: var(--charcoal);
+      margin-bottom: 4px;
+    }
+    .remaining-text p {
+      font-size: 13px;
+      color: var(--gray);
+      line-height: 1.4;
+    }
+
+    /* Weekly Schedule */
+    .schedule-list {
+      padding: 0 18px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .schedule-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 14px;
+      background: var(--cream);
+      border-radius: 10px;
+    }
+    .schedule-day-tag {
+      min-width: 72px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--rose);
+    }
+    .schedule-time {
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 500;
+      color: var(--charcoal);
+      min-width: 48px;
+    }
+    .schedule-prog {
+      font-size: 13px;
+      color: var(--gray);
+      flex: 1;
+    }
+
+    /* Recent Attendances */
+    .attendance-list {
+      padding: 0 18px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .attendance-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--cream-dark);
+    }
+    .attendance-row:last-child { border-bottom: none; }
+    .att-date-block {
+      flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+      background: var(--cream);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .att-date-block .att-day {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--charcoal);
+      line-height: 1;
+    }
+    .att-date-block .att-mon {
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--gray-light);
+    }
+    .att-info { flex: 1 }
+    .att-prog { font-size: 14px; font-weight: 500; color: var(--charcoal); }
+    .att-instr { font-size: 12px; color: var(--gray); margin-top: 2px; }
+    .att-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--sage-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .att-check svg {
+      width: 11px;
+      height: 11px;
+      stroke: var(--sage);
+      stroke-width: 2.5;
+      fill: none;
+    }
+
+    /* Footer / Last updated */
+    .dash-footer {
+      padding: 0 16px 16px;
+      text-align: center;
+    }
+    .updated-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--gray-light);
+      letter-spacing: 0.04em;
+    }
+    .updated-tag svg {
+      width: 12px;
+      height: 12px;
+      stroke: var(--gray-light);
+      fill: none;
+      stroke-width: 1.8;
+    }
+    .build-tag {
+      display: block;
+      font-size: 10px;
+      color: var(--parchment);
+      letter-spacing: 0.06em;
+      margin-top: 4px;
+    }
+
+    /* Empty / error states */
+    .empty-state {
+      padding: 28px 18px;
+      text-align: center;
+    }
+    .empty-state svg {
+      width: 36px;
+      height: 36px;
+      stroke: var(--rose-light);
+      fill: none;
+      margin: 0 auto 12px;
+      display: block;
+    }
+    .empty-state p {
+      font-size: 13px;
+      color: var(--gray);
+      line-height: 1.5;
+    }
+
+    /* Error screen */
+    #screen-error {
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 32px;
+    }
+    .error-icon { font-size: 48px; margin-bottom: 16px; }
+    .error-title {
+      font-family: var(--font-display);
+      font-size: 24px;
+      color: var(--charcoal);
+      margin-bottom: 10px;
+    }
+    .error-body {
+      font-size: 14px;
+      color: var(--gray);
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Misc utils */
+    .divider {
+      height: 1px;
+      background: var(--cream-dark);
+      margin: 0 18px;
+    }
+    .text-center { text-align: center; }
+    .mt-4 { margin-top: 4px; }
+    .mt-8 { margin-top: 8px; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Loading Screen ─────────────────────────────────────────── -->
+  <div id="screen-loading" class="screen active">
+    <div class="loading-logo">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" stroke-width="1.5">
+          <path d="M12 3C8 3 5 6.5 5 10.5c0 5.5 7 10.5 7 10.5s7-5 7-10.5C19 6.5 16 3 12 3z"/>
+          <path d="M12 13a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"/>
+        </svg>
+      </div>
+      <div class="loading-text">Erge Pilates</div>
+      <div class="loading-sub">Şəxsi Paneliniz</div>
+      <div class="loading-spinner"></div>
+    </div>
+  </div>
+
+  <!-- ── Login Screen ───────────────────────────────────────────── -->
+  <div id="screen-login" class="screen">
+    <div class="login-hero">
+      <div class="logo-ring">
+        <svg viewBox="0 0 24 24" stroke-width="1.2">
+          <path d="M12 3C8 3 5 6.5 5 10.5c0 5.5 7 10.5 7 10.5s7-5 7-10.5C19 6.5 16 3 12 3z"/>
+          <path d="M12 13a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"/>
+        </svg>
+      </div>
+      <h1>Erge Pilates</h1>
+      <p>Müştəri Portalı</p>
+    </div>
+
+    <div class="login-body">
+      <h2>Xoş gəldiniz</h2>
+
+      <div class="form-group">
+        <label for="login-email">E-poçt ünvanı</label>
+        <input type="email" id="login-email" placeholder="email@example.com" autocomplete="email" inputmode="email">
+      </div>
+      <div class="form-group">
+        <label for="login-password">Şifrə</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <button class="btn-primary" id="btn-login" onclick="handleLogin()">Daxil ol</button>
+
+      <div class="error-msg" id="login-error"></div>
+    </div>
+  </div>
+
+  <!-- ── Dashboard Screen ──────────────────────────────────────── -->
+  <div id="screen-dashboard" class="screen">
+    <!-- Header -->
+    <div class="dash-header">
+      <div class="dash-header-top">
+        <div>
+          <div class="dash-greeting">Salam,</div>
+          <div class="dash-name" id="dash-name">—</div>
+        </div>
+        <button class="btn-logout" onclick="handleLogout()">Çıxış</button>
+      </div>
+      <div class="dash-quick-stats" id="dash-quick-stats">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="dash-content" id="dash-content">
+      <!-- filled by JS -->
+    </div>
+
+    <!-- Footer -->
+    <div class="dash-footer">
+      <div class="updated-tag" id="updated-tag">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>—</span>
+      </div>
+      <span class="build-tag">client-pilot-pwa-v1-hotfix1</span>
+    </div>
+  </div>
+
+  <!-- ── Error Screen ───────────────────────────────────────────── -->
+  <div id="screen-error" class="screen">
+    <div class="error-icon">🌿</div>
+    <div class="error-title" id="error-title">Xəta baş verdi</div>
+    <div class="error-body" id="error-body">Bir problem yarandı. Zəhmət olmasa yenidən daxil olun.</div>
+    <button class="btn-primary" style="max-width:200px;margin:0 auto;" onclick="showScreen('screen-login')">Geri qayıt</button>
+  </div>
+
+</div><!-- /#app -->
+
+<script>
+/* ──────────────────────────────────────────────────────────────────
+   CONFIG — Replace these two values before deploying
+   ────────────────────────────────────────────────────────────────── */
+const SUPABASE_URL = 'https://sxvwlunlkjxgeblnwkan.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4dndsdW5sa2p4Z2VibG53a2FuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3OTQzNTEsImV4cCI6MjA5NTM3MDM1MX0.9eaN5JaDqSeXIAav0eXMVx6Z8CHIDTEmYfkA3l6t7vo';
+
+/* ──────────────────────────────────────────────────────────────────
+   BUILD MARKER
+   ────────────────────────────────────────────────────────────────── */
+const BUILD = 'client-pilot-pwa-v1-hotfix1';
+
+/* ──────────────────────────────────────────────────────────────────
+   INIT SUPABASE
+   ────────────────────────────────────────────────────────────────── */
+let sbClient;
+try {
+  sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  console.error('Supabase init error:', e);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   HELPERS
+   ────────────────────────────────────────────────────────────────── */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+function showError(title, body) {
+  document.getElementById('error-title').textContent = title;
+  document.getElementById('error-body').textContent  = body;
+  showScreen('screen-error');
+}
+
+const AZ_MONTHS_SHORT = ['yan','fev','mar','apr','may','iyn','iyl','avq','sen','okt','noy','dek'];
+const AZ_MONTHS_LONG  = ['Yanvar','Fevral','Mart','Aprel','May','İyun','İyul','Avqust','Sentyabr','Oktyabr','Noyabr','Dekabr'];
+const AZ_DAYS         = ['Bazar','Bazar ert.','Çərş. ax.','Çərşənbə','Cümə ax.','Cümə','Şənbə'];
+const AZ_DAYS_FULL    = ['Bazar','Bazar ertəsi','Çərşənbə axşamı','Çərşənbə','Cümə axşamı','Cümə','Şənbə'];
+
+function formatDate(dateStr) {
+  // Accepts "YYYY-MM-DD" or ISO string
+  if (!dateStr) return '—';
+  const d = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
+  if (isNaN(d)) return dateStr;
+  return `${d.getDate()} ${AZ_MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function formatDateShort(dateStr) {
+  if (!dateStr) return { day: '—', mon: '' };
+  const d = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
+  if (isNaN(d)) return { day: '—', mon: '' };
+  return { day: d.getDate(), mon: AZ_MONTHS_SHORT[d.getMonth()] };
+}
+
+function formatRelativeTime(isoStr) {
+  if (!isoStr) return '—';
+  const d   = new Date(isoStr);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 60000); // minutes
+  if (diff < 1)   return 'indi';
+  if (diff < 60)  return `${diff} dəq. əvvəl`;
+  const hrs = Math.floor(diff / 60);
+  if (hrs < 24)   return `${hrs} saat əvvəl`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7)   return `${days} gün əvvəl`;
+  return formatDate(isoStr);
+}
+
+function dayOfWeekToAz(dow) {
+  // dow: 0=Sunday … 6=Saturday  OR  1=Monday … 7=Sunday (handle both)
+  const n = parseInt(dow);
+  if (n >= 0 && n <= 6) return AZ_DAYS_FULL[n];     // 0-based Sun-start
+  if (n === 7)           return AZ_DAYS_FULL[0];     // 7=Sunday alt
+  return String(dow);
+}
+
+function statusLabel(status) {
+  const map = { active:'Aktiv', pending:'Gözləmədə', expired:'Bitmişdir', frozen:'Dondurulmuş' };
+  return map[status] || status || '—';
+}
+
+function statusClass(status) {
+  if (status === 'active')  return 'active';
+  if (status === 'expired') return 'expired';
+  return 'pending';
+}
+
+/* SVG icon snippets */
+const ICON = {
+  calendar: `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  clock:    `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  dumbbell: `<svg viewBox="0 0 24 24"><line x1="6" y1="5" x2="6" y2="19"/><line x1="18" y1="5" x2="18" y2="19"/><line x1="6" y1="12" x2="18" y2="12"/><rect x="2" y="9" width="4" height="6" rx="1"/><rect x="18" y="9" width="4" height="6" rx="1"/></svg>`,
+  list:     `<svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
+  check:    `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`,
+};
+
+/* ──────────────────────────────────────────────────────────────────
+   AUTH FLOW
+   ────────────────────────────────────────────────────────────────── */
+async function handleLogin() {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn      = document.getElementById('btn-login');
+  const errEl    = document.getElementById('login-error');
+
+  errEl.classList.remove('visible');
+
+  if (!email || !password) {
+    errEl.textContent = 'E-poçt və şifrəni daxil edin.';
+    errEl.classList.add('visible');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.classList.add('loading-btn');
+
+  try {
+    const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    // success → onAuthStateChange will trigger loadDashboard
+  } catch (err) {
+    btn.disabled = false;
+    btn.classList.remove('loading-btn');
+    const msg = err.message || 'Daxil olmaq mümkün olmadı.';
+    // User-friendly messages
+    if (msg.toLowerCase().includes('invalid login')) {
+      errEl.textContent = 'E-poçt və ya şifrə yanlışdır.';
+    } else if (msg.toLowerCase().includes('email not confirmed')) {
+      errEl.textContent = 'E-poçt ünvanınız təsdiqlənməyib.';
+    } else {
+      errEl.textContent = msg;
+    }
+    errEl.classList.add('visible');
+  }
+}
+
+async function handleLogout() {
+  await sbClient.auth.signOut();
+  showScreen('screen-login');
+  // Clear fields
+  document.getElementById('login-email').value    = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').classList.remove('visible');
+}
+
+// Enter key support on login form
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('login-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleLogin();
+  });
+  document.getElementById('login-email').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('login-password').focus();
+  });
+});
+
+/* ──────────────────────────────────────────────────────────────────
+   SNAPSHOT LOADING
+   ────────────────────────────────────────────────────────────────── */
+async function loadDashboard() {
+  showScreen('screen-loading');
+
+  try {
+    const { data, error } = await sbClient
+      .from('client_snapshots')
+      .select('*')
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows found
+        showError('Məlumat tapılmadı', 'Hesabınıza uyğun abunəlik məlumatı hələ əlavə edilməyib. Zəhmət olmasa studioya müraciət edin.');
+      } else {
+        showError('Xəta baş verdi', error.message || 'Məlumatlar yüklənərkən xəta.');
+      }
+      return;
+    }
+
+    const snap = data.snapshot_data || data.snapshot || data;
+    const updatedAt = data.updated_at || snap.updated_at;
+    renderDashboard(snap, updatedAt);
+
+  } catch (err) {
+    showError('Bağlantı xətası', 'Serverlə əlaqə qurula bilmədi. İnternet bağlantınızı yoxlayın.');
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   DASHBOARD RENDER
+   ────────────────────────────────────────────────────────────────── */
+function renderDashboard(snap, updatedAt) {
+  // ── Customer name — supports snap.customer.name, snap.name, snap.customer_name
+  const name = (snap.customer && snap.customer.name) || snap.name || snap.customer_name || '—';
+  document.getElementById('dash-name').textContent = name;
+
+  // ── Subscription data
+  const sub  = snap.subscription || {};
+  const prog = sub.program_name || sub.program || snap.program || '—';
+  const rem  = sub.remaining != null ? sub.remaining : snap.remaining;
+  // sessions_total is the actual Project B field; fall back to total
+  const tot  = sub.sessions_total != null ? sub.sessions_total : (sub.total != null ? sub.total : snap.total);
+  const sta  = sub.status || snap.status || 'active';
+  const sd   = sub.start_date || snap.start_date;
+  const ed   = sub.end_date   || snap.end_date;
+
+  // ── Quick stats strip
+  const qsEl = document.getElementById('dash-quick-stats');
+  qsEl.innerHTML = `
+    <div class="dash-stat-pill">
+      <div class="stat-val rose">${rem != null ? rem : '—'}</div>
+      <div class="stat-lbl">Qalan dərs</div>
+    </div>
+    <div class="dash-stat-pill">
+      <div class="stat-val">${ed ? formatDateShort(ed).day + ' ' + (AZ_MONTHS_SHORT[new Date(ed + 'T00:00:00').getMonth()] || '') : '—'}</div>
+      <div class="stat-lbl">Son tarix</div>
+    </div>
+    <div class="dash-stat-pill">
+      <div class="stat-val">${(snap.recent_attendances || snap.attendances || []).length}</div>
+      <div class="stat-lbl">Son dərs</div>
+    </div>
+  `;
+
+  // ── Build content
+  const contentEl = document.getElementById('dash-content');
+  contentEl.innerHTML = '';
+
+  // 1. Subscription card
+  contentEl.appendChild(buildSubscriptionCard(prog, sta, rem, tot, sd, ed));
+
+  // 2. Weekly schedule card
+  const schedule = snap.weekly_schedule || snap.schedule || [];
+  contentEl.appendChild(buildScheduleCard(schedule));
+
+  // 3. Recent attendances card
+  const atts = snap.recent_attendances || snap.attendances || [];
+  contentEl.appendChild(buildAttendanceCard(atts));
+
+  // ── Last updated
+  const updEl = document.getElementById('updated-tag');
+  updEl.innerHTML = `
+    ${ICON.clock}
+    <span>Son yenilənmə: ${formatRelativeTime(updatedAt || snap.updated_at)}</span>
+  `;
+
+  showScreen('screen-dashboard');
+}
+
+/* ── Subscription Card ──────────────────────────────────────────── */
+function buildSubscriptionCard(prog, status, rem, tot, sd, ed) {
+  const card = document.createElement('div');
+  card.className = 'section-card';
+
+  // Remaining circle math
+  const remNum = parseInt(rem) || 0;
+  const totNum = parseInt(tot) || (remNum > 0 ? remNum : 1);
+  const pct    = Math.min(remNum / totNum, 1);
+  const r      = 36; // circle radius
+  const circ   = 2 * Math.PI * r;
+  const dashOffset = circ * (1 - pct);
+
+  card.innerHTML = `
+    <div class="section-head">
+      <div class="section-icon rose-bg">${ICON.dumbbell}</div>
+      <span class="section-title">Abunəliyim</span>
+    </div>
+
+    <div class="sub-body">
+      <div class="status-badge ${statusClass(status)}">${statusLabel(status)}</div>
+      <div class="sub-program-name">${escHtml(prog)}</div>
+
+      <div class="remaining-display">
+        <div class="remaining-circle">
+          <svg width="88" height="88" viewBox="0 0 88 88">
+            <circle class="circle-bg" cx="44" cy="44" r="${r}" stroke-width="5" fill="none"/>
+            <circle class="circle-fill" cx="44" cy="44" r="${r}" stroke-width="5" fill="none"
+              stroke-dasharray="${circ.toFixed(2)}"
+              stroke-dashoffset="${dashOffset.toFixed(2)}"/>
+          </svg>
+          <div class="circle-text">
+            <span class="circle-num">${rem != null ? rem : '—'}</span>
+            ${tot != null ? `<span class="circle-of">/ ${tot}</span>` : ''}
+          </div>
+        </div>
+        <div class="remaining-text">
+          <h3>Qalan dərslər</h3>
+          <p>Aktiv abunəliyinizdə istifadə edə biləcəyiniz dərs sayı</p>
+        </div>
+      </div>
+
+      <div class="sub-details-grid">
+        <div class="sub-detail">
+          <div class="detail-lbl">Başlanğıc</div>
+          <div class="detail-val">${formatDate(sd)}</div>
+        </div>
+        <div class="sub-detail">
+          <div class="detail-lbl">Bitmə tarixi</div>
+          <div class="detail-val accent">${formatDate(ed)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  return card;
+}
+
+/* ── Weekly Schedule Card ───────────────────────────────────────── */
+function buildScheduleCard(schedule) {
+  const card = document.createElement('div');
+  card.className = 'section-card';
+
+  let inner;
+  if (!schedule || schedule.length === 0) {
+    inner = `<div class="empty-state">
+      ${ICON.calendar}
+      <p>Sabit cədvəl məlumatı mövcud deyil.</p>
+    </div>`;
+  } else {
+    // Sort by day_of_week
+    const sorted = [...schedule].sort((a, b) => {
+      const da = parseInt(a.day_of_week ?? a.day ?? 99);
+      const db = parseInt(b.day_of_week ?? b.day ?? 99);
+      return da - db;
+    });
+    inner = `<div class="schedule-list">` +
+      sorted.map(row => {
+        const dow    = row.day_of_week ?? row.day;
+        const dayStr = row.day_name || dayOfWeekToAz(dow);
+        const time   = row.time || row.time_slot || '—';
+        const prg    = row.program || row.program_name || '';
+        const instr  = row.instructor || row.instructor_name || '';
+        return `<div class="schedule-row">
+          <span class="schedule-day-tag">${escHtml(dayStr)}</span>
+          <span class="schedule-time">${escHtml(time)}</span>
+          <span class="schedule-prog">${escHtml(prg)}${instr ? ' · ' + instr : ''}</span>
+        </div>`;
+      }).join('') +
+    `</div>`;
+  }
+
+  card.innerHTML = `
+    <div class="section-head">
+      <div class="section-icon parchment-bg">${ICON.calendar}</div>
+      <span class="section-title">Sabit cədvəlim</span>
+    </div>
+    ${inner}
+  `;
+  return card;
+}
+
+/* ── Attendance Card ────────────────────────────────────────────── */
+function buildAttendanceCard(atts) {
+  const card = document.createElement('div');
+  card.className = 'section-card';
+
+  let inner;
+  if (!atts || atts.length === 0) {
+    inner = `<div class="empty-state">
+      ${ICON.list}
+      <p>Hələ ki, dərs tarixi qeydə alınmayıb.</p>
+    </div>`;
+  } else {
+    const recent = atts.slice(0, 8);
+    inner = `<div class="attendance-list">` +
+      recent.map(att => {
+        // class_date is the actual Project B field; fall back to legacy field names
+        const ds    = formatDateShort(att.class_date || att.date || att.attended_at || att.created_at);
+        // class_time is the actual Project B field
+        const time  = att.class_time || att.time || '';
+        // program_name is the actual Project B field
+        const prg   = att.program_name || att.program || '—';
+        // instructor_name is the actual Project B field
+        const instr = att.instructor_name || att.instructor || '';
+        const subLine = [instr, time].filter(Boolean).join(' · ');
+        return `<div class="attendance-row">
+          <div class="att-date-block">
+            <span class="att-day">${ds.day}</span>
+            <span class="att-mon">${ds.mon}</span>
+          </div>
+          <div class="att-info">
+            <div class="att-prog">${escHtml(prg)}</div>
+            ${subLine ? `<div class="att-instr">${escHtml(subLine)}</div>` : ''}
+          </div>
+          <div class="att-check">${ICON.check}</div>
+        </div>`;
+      }).join('') +
+    `</div>`;
+  }
+
+  card.innerHTML = `
+    <div class="section-head">
+      <div class="section-icon sage-bg">${ICON.list}</div>
+      <span class="section-title">Son dərslərim</span>
+    </div>
+    ${inner}
+  `;
+  return card;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   SECURITY: HTML escape
+   ────────────────────────────────────────────────────────────────── */
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   AUTH STATE LISTENER — central routing
+   ────────────────────────────────────────────────────────────────── */
+sbClient.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+    if (session) {
+      // Logged in → load data
+      const btn = document.getElementById('btn-login');
+      if (btn) {
+        btn.disabled = false;
+        btn.classList.remove('loading-btn');
+      }
+      await loadDashboard();
+    } else {
+      // No session
+      showScreen('screen-login');
+    }
+  } else if (event === 'SIGNED_OUT') {
+    showScreen('screen-login');
+  }
+});
+
+/* ──────────────────────────────────────────────────────────────────
+   BOOT — check existing session
+   ────────────────────────────────────────────────────────────────── */
+(async function boot() {
+  try {
+    const { data: { session } } = await sbClient.auth.getSession();
+
+    if (session) {
+      await loadDashboard();
+    } else {
+      showScreen('screen-login');
+    }
+  } catch (err) {
+    console.error('Boot error:', err);
+    showScreen('screen-login');
+  }
+})();
+</script>
+</body>
+</html>
