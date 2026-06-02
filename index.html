@@ -5,10 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#FAF8F4">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Erge Pilates">
   <meta name="description" content="Erge Pilates — Şəxsi Dərs Paneliniz">
-  <title>Erge Pilates — client-pilot-pwa-v1-hotfix3</title>
+  <title>Erge Pilates — client-pilot-pwa-v1-hotfix4</title>
+  <!-- Prevent 404 favicon request -->
+  <link rel="icon" href="data:,">
 
   <!-- Google Fonts: Cormorant Garamond (display) + DM Sans (body) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -791,7 +794,7 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span>—</span>
       </div>
-      <span class="build-tag">client-pilot-pwa-v1-hotfix3</span>
+      <span class="build-tag">client-pilot-pwa-v1-hotfix4</span>
     </div>
   </div>
 
@@ -799,8 +802,8 @@
   <div id="screen-error" class="screen">
     <div class="error-icon">🌿</div>
     <div class="error-title" id="error-title">Xəta baş verdi</div>
-    <div class="error-body" id="error-body">Bir problem yarandı. Zəhmət olmasa yenidən daxil olun.</div>
-    <button class="btn-primary" style="max-width:200px;margin:0 auto;" onclick="showScreen('screen-login')">Geri qayıt</button>
+    <div class="error-body" id="error-body">Bir problem yarandı. Zəhmət olmasa yenidən cəhd edin.</div>
+    <button class="btn-primary" style="max-width:200px;margin:0 auto;" onclick="boot()">Yenidən cəhd et</button>
   </div>
 
 </div><!-- /#app -->
@@ -815,7 +818,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 /* ──────────────────────────────────────────────────────────────────
    BUILD MARKER
    ────────────────────────────────────────────────────────────────── */
-const BUILD = 'client-pilot-pwa-v1-hotfix3';
+const BUILD = 'client-pilot-pwa-v1-hotfix4';
 
 /* ──────────────────────────────────────────────────────────────────
    INIT SUPABASE
@@ -841,6 +844,25 @@ function showError(title, body) {
   document.getElementById('error-body').textContent  = body;
   showScreen('screen-error');
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   TIMEOUT HELPER — race any promise against a deadline
+   ────────────────────────────────────────────────────────────────── */
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise(function(_, reject) {
+      setTimeout(function() {
+        reject(new Error('TIMEOUT:' + label));
+      }, ms);
+    })
+  ]);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   DOUBLE-LOAD GUARD
+   ────────────────────────────────────────────────────────────────── */
+let isLoadingDashboard = false;
 
 const AZ_MONTHS_SHORT = ['yan','fev','mar','apr','may','iyn','iyl','avq','sen','okt','noy','dek'];
 const AZ_MONTHS_LONG  = ['Yanvar','Fevral','Mart','Aprel','May','İyun','İyul','Avqust','Sentyabr','Oktyabr','Noyabr','Dekabr'];
@@ -967,17 +989,22 @@ document.addEventListener('DOMContentLoaded', () => {
    SNAPSHOT LOADING
    ────────────────────────────────────────────────────────────────── */
 async function loadDashboard() {
+  // Double-load guard: drop concurrent calls
+  if (isLoadingDashboard) return;
+  isLoadingDashboard = true;
+
   showScreen('screen-loading');
 
   try {
-    const { data, error } = await sbClient
-      .from('client_snapshots')
-      .select('*')
-      .single();
+    const { data, error } = await withTimeout(
+      sbClient.from('client_snapshots').select('*').single(),
+      11000,
+      'snapshot'
+    );
 
     if (error) {
       if (error.code === 'PGRST116') {
-        // No rows found
+        // No snapshot row for this user yet
         showError('Məlumat tapılmadı', 'Hesabınıza uyğun abunəlik məlumatı hələ əlavə edilməyib. Zəhmət olmasa studioya müraciət edin.');
       } else {
         showError('Xəta baş verdi', error.message || 'Məlumatlar yüklənərkən xəta.');
@@ -985,12 +1012,20 @@ async function loadDashboard() {
       return;
     }
 
-    const snap = data.snapshot_data || data.snapshot || data;
+    const snap      = data.snapshot_data || data.snapshot || data;
     const updatedAt = data.updated_at || snap.updated_at;
     renderDashboard(snap, updatedAt);
 
   } catch (err) {
-    showError('Bağlantı xətası', 'Serverlə əlaqə qurula bilmədi. İnternet bağlantınızı yoxlayın.');
+    if (err.message && err.message.startsWith('TIMEOUT:')) {
+      console.error('[DASHBOARD] Snapshot timeout');
+      showError('Yükləmə vaxtı keçdi', 'Məlumatlar vaxtında yüklənmədi. İnternet bağlantınızı yoxlayıb yenidən cəhd edin.');
+    } else {
+      console.error('[DASHBOARD] Fetch error:', err);
+      showError('Bağlantı xətası', 'Serverlə əlaqə qurula bilmədi. İnternet bağlantınızı yoxlayın.');
+    }
+  } finally {
+    isLoadingDashboard = false;
   }
 }
 
@@ -1218,50 +1253,70 @@ function escHtml(str) {
 }
 
 /* ──────────────────────────────────────────────────────────────────
-   AUTH STATE LISTENER — monitor runtime state changes only
+   AUTH STATE LISTENER — runtime changes only (SIGNED_IN / SIGNED_OUT)
+   Boot owns the initial session check; event listener is for post-login only.
    ────────────────────────────────────────────────────────────────── */
-sbClient.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'SIGNED_IN') {
-    // Explicit sign-in → load dashboard
-    if (session) {
-      await loadDashboard();
+if (sbClient) {
+  sbClient.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN') {
+      if (session) {
+        await loadDashboard();
+      }
+    } else if (event === 'SIGNED_OUT') {
+      showScreen('screen-login');
     }
-  } else if (event === 'SIGNED_OUT') {
-    // Explicit sign-out → show login
-    showScreen('screen-login');
-  }
-  // Note: INITIAL_SESSION is NOT handled here. Boot logic handles initial session.
-});
+  });
+}
 
 /* ──────────────────────────────────────────────────────────────────
-   BOOT — explicit session check and dashboard load, no event listener reliance
+   BOOT — named so error-screen retry button can call boot() again
    ────────────────────────────────────────────────────────────────── */
-(async function boot() {
-  // Show loading screen immediately on boot
+async function boot() {
+  // Guard: sbClient must exist before any auth call
+  if (!sbClient) {
+    showError('Tətbiq xətası', 'Tətbiq düzgün başlana bilmədi. Səhifəni yeniləyin.');
+    return;
+  }
+
+  // Show loading immediately — never leave a previous screen active
   showScreen('screen-loading');
 
   try {
-    const { data: { session }, error } = await sbClient.auth.getSession();
+    const result = await withTimeout(
+      sbClient.auth.getSession(),
+      9000,
+      'getSession'
+    );
+    const session = result && result.data && result.data.session;
+    const authErr = result && result.error;
 
-    if (error) {
-      // Session check error
-      console.error('[BOOT] getSession error:', error.message);
+    if (authErr) {
+      console.error('[BOOT] getSession error:', authErr.message);
       showError('Bağlantı xətası', 'Oturumu yoxlayarkən xəta. İnternet bağlantınızı yoxlayın.');
       return;
     }
 
     if (session) {
-      // Session exists → load dashboard (handles its own loading screen)
+      // Session exists — load dashboard directly, no event-listener dependency
       await loadDashboard();
     } else {
-      // No session → show login
       showScreen('screen-login');
     }
+
   } catch (err) {
-    console.error('[BOOT] Unexpected error:', err);
-    showError('Başlama xətası', 'Tətbiq başlana bilmədi. Zəhmət olmasa səhifəni yeniləyin.');
+    if (err.message && err.message.startsWith('TIMEOUT:')) {
+      // getSession timed out — safe fallback is login screen, not loading screen
+      console.error('[BOOT] Session check timed out');
+      showScreen('screen-login');
+    } else {
+      console.error('[BOOT] Unexpected error:', err);
+      showError('Başlama xətası', 'Tətbiq başlana bilmədi. Zəhmət olmasa yenidən cəhd edin.');
+    }
   }
-})();
+}
+
+// Initial call on page load
+boot();
 </script>
 </body>
 </html>
