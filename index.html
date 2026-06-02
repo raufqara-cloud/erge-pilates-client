@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Erge Pilates">
   <meta name="description" content="Erge Pilates — Şəxsi Dərs Paneliniz">
-  <title>Erge Pilates</title>
+  <title>Erge Pilates — client-pilot-pwa-v1-hotfix3</title>
 
   <!-- Google Fonts: Cormorant Garamond (display) + DM Sans (body) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -791,7 +791,7 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span>—</span>
       </div>
-      <span class="build-tag">client-pilot-pwa-v1-hotfix1</span>
+      <span class="build-tag">client-pilot-pwa-v1-hotfix3</span>
     </div>
   </div>
 
@@ -815,7 +815,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 /* ──────────────────────────────────────────────────────────────────
    BUILD MARKER
    ────────────────────────────────────────────────────────────────── */
-const BUILD = 'client-pilot-pwa-v1-hotfix1';
+const BUILD = 'client-pilot-pwa-v1-hotfix3';
 
 /* ──────────────────────────────────────────────────────────────────
    INIT SUPABASE
@@ -1218,42 +1218,48 @@ function escHtml(str) {
 }
 
 /* ──────────────────────────────────────────────────────────────────
-   AUTH STATE LISTENER — central routing
+   AUTH STATE LISTENER — monitor runtime state changes only
    ────────────────────────────────────────────────────────────────── */
 sbClient.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+  if (event === 'SIGNED_IN') {
+    // Explicit sign-in → load dashboard
     if (session) {
-      // Logged in → load data
-      const btn = document.getElementById('btn-login');
-      if (btn) {
-        btn.disabled = false;
-        btn.classList.remove('loading-btn');
-      }
       await loadDashboard();
-    } else {
-      // No session
-      showScreen('screen-login');
     }
   } else if (event === 'SIGNED_OUT') {
+    // Explicit sign-out → show login
     showScreen('screen-login');
   }
+  // Note: INITIAL_SESSION is NOT handled here. Boot logic handles initial session.
 });
 
 /* ──────────────────────────────────────────────────────────────────
-   BOOT — check existing session
+   BOOT — explicit session check and dashboard load, no event listener reliance
    ────────────────────────────────────────────────────────────────── */
 (async function boot() {
+  // Show loading screen immediately on boot
+  showScreen('screen-loading');
+
   try {
-    const { data: { session } } = await sbClient.auth.getSession();
+    const { data: { session }, error } = await sbClient.auth.getSession();
+
+    if (error) {
+      // Session check error
+      console.error('[BOOT] getSession error:', error.message);
+      showError('Bağlantı xətası', 'Oturumu yoxlayarkən xəta. İnternet bağlantınızı yoxlayın.');
+      return;
+    }
 
     if (session) {
+      // Session exists → load dashboard (handles its own loading screen)
       await loadDashboard();
     } else {
+      // No session → show login
       showScreen('screen-login');
     }
   } catch (err) {
-    console.error('Boot error:', err);
-    showScreen('screen-login');
+    console.error('[BOOT] Unexpected error:', err);
+    showError('Başlama xətası', 'Tətbiq başlana bilmədi. Zəhmət olmasa səhifəni yeniləyin.');
   }
 })();
 </script>
