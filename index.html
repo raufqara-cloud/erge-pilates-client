@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Erge Pilates">
   <meta name="description" content="Erge Pilates — Şəxsi Dərs Paneliniz">
-  <title>Erge Pilates — client-pilot-pwa-v1-hotfix4</title>
+  <title>Erge Pilates — clientb-last-updated-stale-warning-v1</title>
   <!-- Prevent 404 favicon request -->
   <link rel="icon" href="data:,">
 
@@ -657,6 +657,28 @@
       letter-spacing: 0.06em;
       margin-top: 4px;
     }
+    .stale-warning {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 10px 16px 0;
+      padding: 10px 12px;
+      background: rgba(200,100,30,0.13);
+      border: 1px solid rgba(200,100,30,0.35);
+      border-radius: 10px;
+      font-size: 12px;
+      color: #c8641e;
+      line-height: 1.45;
+    }
+    .stale-warning svg {
+      flex-shrink: 0;
+      margin-top: 1px;
+      width: 14px;
+      height: 14px;
+      stroke: #c8641e;
+      fill: none;
+      stroke-width: 2;
+    }
 
     /* Empty / error states */
     .empty-state {
@@ -788,13 +810,19 @@
       <!-- filled by JS -->
     </div>
 
+    <!-- Stale data warning banner (shown by JS when snapshot is old or timestamp missing) -->
+    <div class="stale-warning" id="stale-warning-banner" style="display:none">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>Məlumat köhnə ola bilər. Yenilənməsi üçün studio ilə əlaqə saxlayın.</span>
+    </div>
+
     <!-- Footer -->
     <div class="dash-footer">
       <div class="updated-tag" id="updated-tag">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span>—</span>
       </div>
-      <span class="build-tag">client-pilot-pwa-v1-hotfix4</span>
+      <span class="build-tag">clientb-last-updated-stale-warning-v1</span>
     </div>
   </div>
 
@@ -818,7 +846,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 /* ──────────────────────────────────────────────────────────────────
    BUILD MARKER
    ────────────────────────────────────────────────────────────────── */
-const BUILD = 'client-pilot-pwa-v1-hotfix4';
+const BUILD = 'clientb-last-updated-stale-warning-v1';
 
 /* ──────────────────────────────────────────────────────────────────
    INIT SUPABASE
@@ -896,6 +924,24 @@ function formatRelativeTime(isoStr) {
   const days = Math.floor(hrs / 24);
   if (days < 7)   return `${days} gün əvvəl`;
   return formatDate(isoStr);
+}
+
+const SNAPSHOT_STALE_HOURS = 24;
+
+function formatBakuDateTime(isoStr) {
+  if (!isoStr) return null;
+  const d = new Date(isoStr);
+  if (isNaN(d)) return null;
+  try {
+    return new Intl.DateTimeFormat('az-AZ', {
+      timeZone: 'Asia/Baku',
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    }).format(d);
+  } catch (e) {
+    // Fallback if Intl/timeZone unsupported
+    return formatDate(isoStr);
+  }
 }
 
 function dayOfWeekToAz(dow) {
@@ -1014,7 +1060,8 @@ async function loadDashboard() {
 
     const snap      = data.snapshot_data || data.snapshot || data;
     const updatedAt = data.updated_at || snap.updated_at;
-    renderDashboard(snap, updatedAt);
+    const projGenAt = snap.projection_generated_at || null;
+    renderDashboard(snap, updatedAt, projGenAt);
 
   } catch (err) {
     if (err.message && err.message.startsWith('TIMEOUT:')) {
@@ -1032,7 +1079,7 @@ async function loadDashboard() {
 /* ──────────────────────────────────────────────────────────────────
    DASHBOARD RENDER
    ────────────────────────────────────────────────────────────────── */
-function renderDashboard(snap, updatedAt) {
+function renderDashboard(snap, updatedAt, projGenAt) {
   // ── Customer name — supports snap.customer.name, snap.name, snap.customer_name
   const name = (snap.customer && snap.customer.name) || snap.name || snap.customer_name || '—';
   document.getElementById('dash-name').textContent = name;
@@ -1079,12 +1126,34 @@ function renderDashboard(snap, updatedAt) {
   const atts = snap.recent_attendances || snap.attendances || [];
   contentEl.appendChild(buildAttendanceCard(atts));
 
-  // ── Last updated
+  // ── Last updated + stale warning
   const updEl = document.getElementById('updated-tag');
-  updEl.innerHTML = `
-    ${ICON.clock}
-    <span>Son yenilənmə: ${formatRelativeTime(updatedAt || snap.updated_at)}</span>
-  `;
+  // Timestamp priority: projection_generated_at → updated_at
+  const tsRaw = projGenAt || updatedAt || snap.updated_at || null;
+  const tsDate = tsRaw ? new Date(tsRaw) : null;
+  const tsValid = tsDate && !isNaN(tsDate);
+
+  if (tsValid) {
+    const formatted = formatBakuDateTime(tsRaw);
+    updEl.innerHTML = `
+      ${ICON.clock}
+      <span>Məlumat son yenilənib: ${formatted}</span>
+    `;
+    // Stale check
+    const ageHours = (Date.now() - tsDate.getTime()) / 3600000;
+    const staleEl = document.getElementById('stale-warning-banner');
+    if (ageHours > SNAPSHOT_STALE_HOURS) {
+      staleEl.style.display = 'flex';
+    } else {
+      staleEl.style.display = 'none';
+    }
+  } else {
+    updEl.innerHTML = `
+      ${ICON.clock}
+      <span>Son yenilənmə tarixi məlum deyil</span>
+    `;
+    document.getElementById('stale-warning-banner').style.display = 'flex';
+  }
 
   showScreen('screen-dashboard');
 }
