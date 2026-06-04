@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Erge Pilates">
   <meta name="description" content="Erge Pilates — Şəxsi Dərs Paneliniz">
-  <title>Erge Pilates — clientb-last-updated-stale-warning-v1</title>
+  <title>Erge Pilates — clientb-contact-request-workflow-v1</title>
   <!-- Prevent 404 favicon request -->
   <link rel="icon" href="data:,">
 
@@ -738,6 +738,129 @@
     .text-center { text-align: center; }
     .mt-4 { margin-top: 4px; }
     .mt-8 { margin-top: 8px; }
+
+    /* ── Contact Request Card ──────────────────────────────────────── */
+    .contact-request-card {
+      margin: 0 16px 16px;
+      background: var(--white);
+      border-radius: 16px;
+      box-shadow: var(--card-shadow);
+      padding: 20px;
+      animation: fadeInUp 0.35s ease both;
+    }
+    .contact-request-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .contact-request-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--rose-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .contact-request-icon svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--rose);
+      stroke-width: 1.8;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .contact-request-title {
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 500;
+      color: var(--charcoal);
+      letter-spacing: 0.01em;
+    }
+    .contact-request-desc {
+      font-size: 13px;
+      color: var(--gray);
+      line-height: 1.55;
+      margin-bottom: 14px;
+    }
+    .contact-request-textarea {
+      width: 100%;
+      border: 1px solid var(--cream-dark);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--ink);
+      background: var(--cream);
+      resize: none;
+      min-height: 80px;
+      outline: none;
+      transition: border-color 0.18s;
+      margin-bottom: 12px;
+      box-sizing: border-box;
+    }
+    .contact-request-textarea:focus {
+      border-color: var(--rose-light);
+      background: var(--white);
+    }
+    .contact-request-textarea::placeholder {
+      color: var(--gray-light);
+    }
+    .contact-char-count {
+      display: block;
+      font-size: 11px;
+      color: var(--gray-light);
+      text-align: right;
+      margin-top: -8px;
+      margin-bottom: 12px;
+    }
+    .btn-contact-request {
+      width: 100%;
+      padding: 13px 20px;
+      background: var(--rose);
+      color: var(--white);
+      border: none;
+      border-radius: 12px;
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.18s, opacity 0.18s;
+      letter-spacing: 0.01em;
+    }
+    .btn-contact-request:hover:not(:disabled) {
+      background: #b37060;
+    }
+    .btn-contact-request:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .contact-request-status {
+      margin-top: 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: none;
+    }
+    .contact-request-status.success {
+      display: block;
+      background: #EBF4EC;
+      color: #3D7A40;
+    }
+    .contact-request-status.pending-warn {
+      display: block;
+      background: #FFF7ED;
+      color: #A0622A;
+    }
+    .contact-request-status.error {
+      display: block;
+      background: #FDECEA;
+      color: #B23C3C;
+    }
   </style>
 </head>
 <body>
@@ -822,7 +945,7 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span>—</span>
       </div>
-      <span class="build-tag">clientb-last-updated-stale-warning-v1</span>
+      <span class="build-tag">clientb-contact-request-workflow-v1</span>
     </div>
   </div>
 
@@ -846,7 +969,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 /* ──────────────────────────────────────────────────────────────────
    BUILD MARKER
    ────────────────────────────────────────────────────────────────── */
-const BUILD = 'clientb-last-updated-stale-warning-v1';
+const BUILD = 'clientb-contact-request-workflow-v1';
 
 /* ──────────────────────────────────────────────────────────────────
    INIT SUPABASE
@@ -1115,6 +1238,10 @@ function renderDashboard(snap, updatedAt, projGenAt) {
   const contentEl = document.getElementById('dash-content');
   contentEl.innerHTML = '';
 
+  // Reset contact-request module state on every render
+  _crSnapCustomerId = (snap.customer && snap.customer.customer_id) || snap.customer_id || null;
+  _crSubmitting     = false;
+
   // 1. Subscription card
   contentEl.appendChild(buildSubscriptionCard(prog, sta, rem, tot, sd, ed));
 
@@ -1125,6 +1252,9 @@ function renderDashboard(snap, updatedAt, projGenAt) {
   // 3. Recent attendances card
   const atts = snap.recent_attendances || snap.attendances || [];
   contentEl.appendChild(buildAttendanceCard(atts));
+
+  // 4. Contact request card
+  contentEl.appendChild(buildContactRequestCard());
 
   // ── Last updated + stale warning
   const updEl = document.getElementById('updated-tag');
@@ -1319,6 +1449,177 @@ function escHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   CONTACT REQUEST WORKFLOW
+   ── buildContactRequestCard() — appended to dash-content by renderDashboard()
+   ── submitContactRequest()    — called by card button; inserts into client_requests
+   ────────────────────────────────────────────────────────────────── */
+
+// Module-level state — reset on each renderDashboard() call
+let _crSnapCustomerId = null;   // customer_id from current snapshot, set in renderDashboard
+let _crSubmitting     = false;  // in-flight guard
+
+function buildContactRequestCard() {
+  const card = document.createElement('div');
+  card.className = 'contact-request-card';
+  card.id = 'contact-request-card';
+
+  card.innerHTML = `
+    <div class="contact-request-head">
+      <div class="contact-request-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.8 19.79 19.79 0 01.02 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92v2z"/>
+        </svg>
+      </div>
+      <div class="contact-request-title">Reception ilə əlaqə</div>
+    </div>
+    <div class="contact-request-desc">
+      Resepsiyadan sizi zəng etmələrini və ya mesaj göndərmələrini istəyirsinizsə, düyməyə basın.
+    </div>
+    <textarea
+      id="cr-message"
+      class="contact-request-textarea"
+      placeholder="İstəyinizi qısaca qeyd edə bilərsiniz (opsional)"
+      maxlength="300"
+      rows="3"
+      oninput="crUpdateCharCount(this)"
+    ></textarea>
+    <span class="contact-char-count" id="cr-char-count">0 / 300</span>
+    <button
+      class="btn-contact-request"
+      id="btn-contact-request"
+      onclick="submitContactRequest()"
+    >Mənimlə əlaqə saxlayın</button>
+    <div class="contact-request-status" id="cr-status"></div>
+  `;
+  return card;
+}
+
+function crUpdateCharCount(textarea) {
+  const el = document.getElementById('cr-char-count');
+  if (el) el.textContent = (textarea.value.length) + ' / 300';
+}
+
+async function submitContactRequest() {
+  if (_crSubmitting) return;
+
+  const btn     = document.getElementById('btn-contact-request');
+  const statusEl = document.getElementById('cr-status');
+  const msgEl   = document.getElementById('cr-message');
+
+  if (!btn || !statusEl || !msgEl) return;
+
+  // Hide previous status
+  statusEl.className = 'contact-request-status';
+  statusEl.textContent = '';
+
+  // Validate we have a customer_id from current snapshot
+  if (!_crSnapCustomerId) {
+    statusEl.className = 'contact-request-status error';
+    statusEl.textContent = 'Müştəri məlumatı tapılmadı. Zəhmət olmasa yenidən daxil olun.';
+    return;
+  }
+
+  // Get current session
+  let session;
+  try {
+    const result = await sbClient.auth.getSession();
+    session = result && result.data && result.data.session;
+  } catch (e) {
+    statusEl.className = 'contact-request-status error';
+    statusEl.textContent = 'Oturum xətası. Zəhmət olmasa yenidən daxil olun.';
+    return;
+  }
+
+  if (!session) {
+    statusEl.className = 'contact-request-status error';
+    statusEl.textContent = 'Oturum tapılmadı. Zəhmət olmasa yenidən daxil olun.';
+    return;
+  }
+
+  const authUid = session.user && session.user.id;
+  if (!authUid) {
+    statusEl.className = 'contact-request-status error';
+    statusEl.textContent = 'İstifadəçi məlumatı tapılmadı. Zəhmət olmasa yenidən daxil olun.';
+    return;
+  }
+
+  _crSubmitting = true;
+  btn.disabled = true;
+  btn.textContent = 'Göndərilir…';
+
+  try {
+    // 1. Check if a pending contact_me request already exists for this user
+    const { data: existingRows, error: checkErr } = await sbClient
+      .from('client_requests')
+      .select('id, status')
+      .eq('request_type', 'contact_me')
+      .eq('status', 'pending')
+      .limit(1);
+
+    if (checkErr) {
+      // If table doesn't exist yet (42P01), give a clear message
+      const msg = checkErr.message || '';
+      if (msg.includes('42P01') || msg.toLowerCase().includes('does not exist')) {
+        statusEl.className = 'contact-request-status error';
+        statusEl.textContent = 'Müraciət sistemi hələ qurulmayıb. Studio ilə əlaqə saxlayın.';
+      } else {
+        statusEl.className = 'contact-request-status error';
+        statusEl.textContent = 'Yoxlama zamanı xəta baş verdi. Yenidən cəhd edin.';
+      }
+      return;
+    }
+
+    if (existingRows && existingRows.length > 0) {
+      statusEl.className = 'contact-request-status pending-warn';
+      statusEl.textContent = 'Müraciətiniz artıq göndərilib. Resepsiya tezliklə sizinlə əlaqə saxlayacaq.';
+      return;
+    }
+
+    // 2. Get message (optional, trim, cap at 300 chars)
+    const rawMsg = (msgEl.value || '').trim();
+    const message = rawMsg.length > 0 ? rawMsg.slice(0, 300) : null;
+
+    // 3. Insert new pending request
+    // auth_uid is set server-side via DEFAULT auth.uid() in DB;
+    // customer_id is provided explicitly from snapshot and validated by RLS policy.
+    const { error: insertErr } = await sbClient
+      .from('client_requests')
+      .insert({
+        customer_id:  _crSnapCustomerId,
+        request_type: 'contact_me',
+        message:      message,
+        status:       'pending',
+        source:       'client_portal'
+      });
+
+    if (insertErr) {
+      console.error('[CR] insert error:', insertErr);
+      statusEl.className = 'contact-request-status error';
+      statusEl.textContent = 'Müraciət göndərilmədi. Yenidən cəhd edin və ya studio ilə əlaqə saxlayın.';
+      return;
+    }
+
+    // 4. Success state — clear textarea, show success, keep button disabled to prevent re-submit
+    msgEl.value = '';
+    crUpdateCharCount(msgEl);
+    statusEl.className = 'contact-request-status success';
+    statusEl.textContent = 'Müraciətiniz göndərildi! Resepsiya tezliklə sizinlə əlaqə saxlayacaq.';
+    btn.textContent = 'Göndərildi ✓';
+    // Button stays disabled — user has a pending request now
+
+  } catch (err) {
+    console.error('[CR] unexpected error:', err);
+    statusEl.className = 'contact-request-status error';
+    statusEl.textContent = 'Gözlənilməz xəta. Yenidən cəhd edin.';
+    btn.disabled = false;
+    btn.textContent = 'Mənimlə əlaqə saxlayın';
+  } finally {
+    _crSubmitting = false;
+    // Note: btn.disabled intentionally NOT reset on success path
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────
