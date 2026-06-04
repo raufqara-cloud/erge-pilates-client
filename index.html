@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Erge Pilates">
   <meta name="description" content="Erge Pilates — Şəxsi Dərs Paneliniz">
-  <title>Erge Pilates — clientb-contact-request-workflow-v1</title>
+  <title>Erge Pilates — clientb-contact-request-workflow-v1-hotfix1</title>
   <!-- Prevent 404 favicon request -->
   <link rel="icon" href="data:,">
 
@@ -945,7 +945,7 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span>—</span>
       </div>
-      <span class="build-tag">clientb-contact-request-workflow-v1</span>
+      <span class="build-tag">clientb-contact-request-workflow-v1-hotfix1</span>
     </div>
   </div>
 
@@ -969,7 +969,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 /* ──────────────────────────────────────────────────────────────────
    BUILD MARKER
    ────────────────────────────────────────────────────────────────── */
-const BUILD = 'clientb-contact-request-workflow-v1';
+const BUILD = 'clientb-contact-request-workflow-v1-hotfix1';
 
 /* ──────────────────────────────────────────────────────────────────
    INIT SUPABASE
@@ -1505,53 +1505,51 @@ function crUpdateCharCount(textarea) {
 async function submitContactRequest() {
   if (_crSubmitting) return;
 
-  const btn     = document.getElementById('btn-contact-request');
+  const btn      = document.getElementById('btn-contact-request');
   const statusEl = document.getElementById('cr-status');
-  const msgEl   = document.getElementById('cr-message');
+  const msgEl    = document.getElementById('cr-message');
 
   if (!btn || !statusEl || !msgEl) return;
 
   // Hide previous status
-  statusEl.className = 'contact-request-status';
+  statusEl.className   = 'contact-request-status';
   statusEl.textContent = '';
 
-  // Validate we have a customer_id from current snapshot
+  // Pre-flight checks (button not yet disabled — no restore needed here)
   if (!_crSnapCustomerId) {
-    statusEl.className = 'contact-request-status error';
+    statusEl.className   = 'contact-request-status error';
     statusEl.textContent = 'Müştəri məlumatı tapılmadı. Zəhmət olmasa yenidən daxil olun.';
     return;
   }
 
-  // Get current session
   let session;
   try {
     const result = await sbClient.auth.getSession();
     session = result && result.data && result.data.session;
   } catch (e) {
-    statusEl.className = 'contact-request-status error';
+    statusEl.className   = 'contact-request-status error';
     statusEl.textContent = 'Oturum xətası. Zəhmət olmasa yenidən daxil olun.';
     return;
   }
 
-  if (!session) {
-    statusEl.className = 'contact-request-status error';
+  if (!session || !(session.user && session.user.id)) {
+    statusEl.className   = 'contact-request-status error';
     statusEl.textContent = 'Oturum tapılmadı. Zəhmət olmasa yenidən daxil olun.';
     return;
   }
 
-  const authUid = session.user && session.user.id;
-  if (!authUid) {
-    statusEl.className = 'contact-request-status error';
-    statusEl.textContent = 'İstifadəçi məlumatı tapılmadı. Zəhmət olmasa yenidən daxil olun.';
-    return;
-  }
+  // ── All pre-flight passed: lock button ───────────────────────────
+  _crSubmitting    = true;
+  btn.disabled     = true;
+  btn.textContent  = 'Göndərilir…';
 
-  _crSubmitting = true;
-  btn.disabled = true;
-  btn.textContent = 'Göndərilir…';
+  // _success tracks whether the final state should keep the button locked.
+  // Everything else (all error paths) must restore the button via finally.
+  let _success  = false;
+  let _hasPending = false;
 
   try {
-    // 1. Check if a pending contact_me request already exists for this user
+    // 1. Check for an existing pending contact_me request (RLS-scoped to own rows)
     const { data: existingRows, error: checkErr } = await sbClient
       .from('client_requests')
       .select('id, status')
@@ -1560,31 +1558,28 @@ async function submitContactRequest() {
       .limit(1);
 
     if (checkErr) {
-      // If table doesn't exist yet (42P01), give a clear message
       const msg = checkErr.message || '';
       if (msg.includes('42P01') || msg.toLowerCase().includes('does not exist')) {
-        statusEl.className = 'contact-request-status error';
+        statusEl.className   = 'contact-request-status error';
         statusEl.textContent = 'Müraciət sistemi hələ qurulmayıb. Studio ilə əlaqə saxlayın.';
       } else {
-        statusEl.className = 'contact-request-status error';
+        statusEl.className   = 'contact-request-status error';
         statusEl.textContent = 'Yoxlama zamanı xəta baş verdi. Yenidən cəhd edin.';
       }
-      return;
+      return; // finally will restore button
     }
 
     if (existingRows && existingRows.length > 0) {
-      statusEl.className = 'contact-request-status pending-warn';
+      _hasPending = true;
+      statusEl.className   = 'contact-request-status pending-warn';
       statusEl.textContent = 'Müraciətiniz artıq göndərilib. Resepsiya tezliklə sizinlə əlaqə saxlayacaq.';
-      return;
+      return; // finally will restore button (pending path — retryable if admin resolves later)
     }
 
-    // 2. Get message (optional, trim, cap at 300 chars)
-    const rawMsg = (msgEl.value || '').trim();
+    // 2. Insert new pending request
+    const rawMsg  = (msgEl.value || '').trim();
     const message = rawMsg.length > 0 ? rawMsg.slice(0, 300) : null;
 
-    // 3. Insert new pending request
-    // auth_uid is set server-side via DEFAULT auth.uid() in DB;
-    // customer_id is provided explicitly from snapshot and validated by RLS policy.
     const { error: insertErr } = await sbClient
       .from('client_requests')
       .insert({
@@ -1597,28 +1592,33 @@ async function submitContactRequest() {
 
     if (insertErr) {
       console.error('[CR] insert error:', insertErr);
-      statusEl.className = 'contact-request-status error';
+      statusEl.className   = 'contact-request-status error';
       statusEl.textContent = 'Müraciət göndərilmədi. Yenidən cəhd edin və ya studio ilə əlaqə saxlayın.';
-      return;
+      return; // finally will restore button
     }
 
-    // 4. Success state — clear textarea, show success, keep button disabled to prevent re-submit
+    // 3. Success — clear textarea, lock button permanently for this session
+    _success = true;
     msgEl.value = '';
     crUpdateCharCount(msgEl);
-    statusEl.className = 'contact-request-status success';
+    statusEl.className   = 'contact-request-status success';
     statusEl.textContent = 'Müraciətiniz göndərildi! Resepsiya tezliklə sizinlə əlaqə saxlayacaq.';
     btn.textContent = 'Göndərildi ✓';
-    // Button stays disabled — user has a pending request now
+    // btn.disabled stays true — intentional; user has a pending request
 
   } catch (err) {
     console.error('[CR] unexpected error:', err);
-    statusEl.className = 'contact-request-status error';
+    statusEl.className   = 'contact-request-status error';
     statusEl.textContent = 'Gözlənilməz xəta. Yenidən cəhd edin.';
-    btn.disabled = false;
-    btn.textContent = 'Mənimlə əlaqə saxlayın';
+    // finally will restore button
+
   } finally {
     _crSubmitting = false;
-    // Note: btn.disabled intentionally NOT reset on success path
+    // Restore button on every non-success path
+    if (!_success) {
+      btn.disabled    = false;
+      btn.textContent = 'Mənimlə əlaqə saxlayın';
+    }
   }
 }
 
